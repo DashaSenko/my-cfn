@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ---
+Parameters:
+  RdsSubnetCIDR1:
+    Description: Rds Private Subnet 1 CIDR range
+    Type: String
+    Default: 10.10.3.0/25
+  RdsSubnetCIDR2:
+    Description: Rds Private Subnet 2 CIDR range
+    Type: String
+    Default: 10.10.3.128/25
+
+Resources:
+  RdsPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !ImportValue  VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref RdsSubnetCIDR1
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Rds Private Subnet 1
+  
+  RdsPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !ImportValue  VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref RdsSubnetCIDR2
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Rds Private Subnet 2
+  
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !ImportValue  PublicSubnet1
+
+  RdsRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !ImportValue  VPC
+      Tags:
+        - Key: Name
+          Value: ECS Rds Private Routes (AZ1)
+
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RdsRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RdsRouteTable
+      SubnetId: !Ref RdsPrivateSubnet1
+  
+  PrivateSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RdsRouteTable
+      SubnetId: !Ref RdsPrivateSubnet2
+
+Outputs:
+  RdsPrivateSubnet1:
+    Description: Reference to the created Database Private subnet
+    Value: !Ref RdsPrivateSubnet1
+    Export:
+      Name: RdsPrivateSubnet1
+  RdsPrivateSubnet2:
+    Description: Reference to the created Database Private subnet
+    Value: !Ref RdsPrivateSubnet2
+    Export:
+      Name: RdsPrivateSubnet2

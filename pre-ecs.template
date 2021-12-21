@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ---
+Parameters:
+  MyIPsList:
+    Description: A list of Ip addressess at Home and Office
+    Type: CommaDelimitedList
+    Default: 46.53.251.151/32,46.53.243.176/32,82.209.240.102/32
+  ECRImageNamesList:
+    Description: A list that contains already build ECR images
+    Type: CommaDelimitedList
+    Default: 616750136093.dkr.ecr.eu-central-1.amazonaws.com/image1, 616750136093.dkr.ecr.eu-central-1.amazonaws.com/image2:latest
+
+Resources:
+  EcsEc2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "ECS EC2 Security Group"
+      VpcId: !ImportValue VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: !ImportValue VpcCIDR
+        Description: "Allow all incoming from internal VPC"
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Select [0, !Ref MyIPsList]
+        Description: "Allow SSH from Home1"
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Select [1, !Ref MyIPsList]
+        Description: "Allow SSH from Home2"
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Select [2, !Ref MyIPsList]
+        Description: "Allow SSH from the Office"
+      Tags:
+        - Key: Name
+          Value: EcsEc2SecurityGroup
+
+  EcsCloudwatchLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: EcsEc2Logs
+      RetentionInDays: 1
+
+  EcsImage1TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties: 
+      Cpu: 256
+      Memory: 512
+      NetworkMode: bridge
+      RequiresCompatibilities: 
+        - EC2
+      ContainerDefinitions: 
+        - Name: Image1-Container
+          Image: !Select [0, !Ref ECRImageNamesList]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref EcsCloudwatchLogsGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ECS-Image1
+          PortMappings:
+            - ContainerPort: 80
+      Tags: 
+        - Key: Name
+          Value: Image1 Task Definition
+  
+  EcsImage2TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties: 
+      Cpu: 256
+      Memory: 512
+      NetworkMode: bridge
+      RequiresCompatibilities: 
+        - EC2
+      ContainerDefinitions: 
+        - Name: Image2-Container
+          Image: !Select [1, !Ref ECRImageNamesList]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref EcsCloudwatchLogsGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ECS-Image2
+          PortMappings:
+            - ContainerPort: 80
+      Tags: 
+        - Key: Name
+          Value: Image2 Task Definition
+  
+  

@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ---
+Parameters:
+  DbName:
+    Description: The database name
+    Type: String
+    Default: demo
+  DbAllocatedStorage:
+    Description: The size of the database (Gb)
+    Type: Number
+    Default: 20
+  DbInstanceClass:
+    Description: The database instance type
+    Type: String
+    Default: db.t2.small
+  DbUser:
+    Description: Admin username for the database.
+    Type: String
+    Default: dasha
+  DbPassword:
+    Description: The password for the database.
+    Type: String
+    Default: SecurePassword
+    "NoEcho": true
+Resources:
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Rds Security Group"
+      VpcId: !ImportValue VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+        CidrIp: !ImportValue VpcCIDR
+        Description: "Allow requests for MySQL port only from inside the VPC"
+      Tags:
+        - Key: Name
+          Value: RdsSecurityGroup
+
+  RdsSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: Rds Subnet Group
+      DBSubnetGroupName: RdsSubnetGroup
+      SubnetIds: 
+        - !ImportValue RdsPrivateSubnet1
+        - !ImportValue RdsPrivateSubnet2
+
+  
+  RdsInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref DbName
+      AllocatedStorage: !Ref DbAllocatedStorage
+      DBInstanceClass: !Ref DbInstanceClass
+      BackupRetentionPeriod: 0
+      Engine: MySQL
+      MasterUsername: !Ref DbUser
+      MasterUserPassword: !Ref DbPassword
+      MultiAZ: false
+      VPCSecurityGroups: 
+      - !GetAtt RdsSecurityGroup.GroupId
+      DBSubnetGroupName: !Ref RdsSubnetGroup
+      Tags:
+      - Key: Name
+        Value: !Ref DbName
+    DeletionPolicy: Delete
+
+Outputs:
+  RdsEndpointAddress:
+    Description: Created RDS Endpoint Address
+    Value: !GetAtt RdsInstance.Endpoint.Address
